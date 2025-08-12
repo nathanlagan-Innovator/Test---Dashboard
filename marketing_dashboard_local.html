@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Innovator ETFs Marketing Dashboard (Local XLSX)</title>
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-ENjdO4Dr2bkBIFxQpeoHi2ue3Z8U6nQ8v5YQlZluq2x0AP+JcXn/tWtIaxVXMw"
+    crossorigin="anonymous"
+  />
+  <!-- FullCalendar CSS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css"
+  />
+  <style>
+    body {
+      background-color: #f5f6fa;
+      color: #333;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      font-weight: 600;
+      color: #002d38;
+    }
+    .sidebar {
+      height: 100vh;
+      overflow-y: auto;
+      padding: 20px;
+      background-color: #002d38;
+      color: #fff;
+    }
+    .activation-card {
+      margin-bottom: 1rem;
+      border: none;
+    }
+    .activation-card .card-header {
+      background-color: #003f4c;
+      color: #fff;
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+    }
+    .activation-card .card-header .form-check-input {
+      margin-right: 0.5rem;
+    }
+    .activation-card .card-body {
+      padding: 0;
+      background-color: #002d38;
+    }
+    .activation-card .list-group-item {
+      background-color: transparent;
+      border: none;
+      color: #d0e4ec;
+      padding: 0.25rem 1rem;
+    }
+    .activation-card .list-group-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    .main-content {
+      padding: 20px;
+    }
+    .calendar-container {
+      max-width: 100%;
+    }
+    .color-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <nav class="col-md-3 sidebar">
+        <h2 class="mb-4">Activations</h2>
+        <div id="activation-sections"></div>
+      </nav>
+      <main class="col-md-9 main-content">
+        <h2 class="mb-3">Innovator ETFs Marketing Calendar</h2>
+        <div id="summary" class="alert alert-info d-none"></div>
+        <div id="calendar" class="calendar-container"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-qHNcA3O2C5f5ZCPzMcxny4Xpi3R6Rj9v1AFQRl4X0WGBuLW620aaHgrPaC3wWcSY"
+          crossorigin="anonymous"></script>
+  <script>
+    const COLORS = [
+      '#5D737E','#64B6AC','#C0D6DF','#C7B198',
+      '#A26769','#6B4226','#B2B1B9','#A99985',
+      '#77966D','#858ae3','#8e806a','#e9d5ca'
+    ];
+    let colorMap = {};
+    let globalEvents = [];
+    let calendar;
+    let selectedCategories = new Set();
+
+    function initCalendar() {
+      const calendarEl = document.getElementById('calendar');
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek'
+        },
+        height: 'auto',
+        events: [],
+        eventDidMount: info => {
+          const description = info.event.extendedProps.description;
+          if (description) {
+            info.el.setAttribute('title', description);
+          }
+        }
+      });
+      calendar.render();
+    }
+
+    function renderCalendarEvents() {
+      calendar.getEvents().forEach(e => e.remove());
+      const filtered = globalEvents.filter(evt => selectedCategories.size === 0 || selectedCategories.has(evt.title));
+      filtered.forEach(evt => calendar.addEvent(evt));
+    }
+
+    function buildActivationSections(data) {
+      const container = document.getElementById('activation-sections');
+      container.innerHTML = '';
+      const groups = {};
+      data.forEach(row => {
+        const cat = row['Item']?.toString().trim();
+        const dateStr = row['Date'];
+        if (!cat || !dateStr) return;
+        if (!groups[cat]) groups[cat] = [];
+        const date = new Date(dateStr);
+        const desc = row['Description']?.toString().trim() || '';
+        groups[cat].push({ date, desc });
+      });
+      const categories = Object.keys(groups).sort();
+      let colorIndex = 0;
+      categories.forEach(cat => {
+        if (!colorMap[cat]) {
+          colorMap[cat] = COLORS[colorIndex % COLORS.length];
+          colorIndex++;
+        }
+        groups[cat].sort((a,b) => a.date - b.date);
+        const eventsInCat = groups[cat];
+        const sanitizedId = cat.replace(/[^a-zA-Z0-9]/g, '');
+        const card = document.createElement('div');
+        card.className = 'card activation-card';
+        const header = document.createElement('div');
+        header.className = 'card-header d-flex align-items-center';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input me-2';
+        checkbox.dataset.category = cat;
+        checkbox.addEventListener('change', function() {
+          if (this.checked) selectedCategories.add(cat); else selectedCategories.delete(cat);
+          renderCalendarEvents();
+        });
+        header.appendChild(checkbox);
+        const dot = document.createElement('span');
+        dot.className = 'color-dot';
+        dot.style.backgroundColor = colorMap[cat];
+        header.appendChild(dot);
+        const label = document.createElement('span');
+        label.textContent = `${cat} (${eventsInCat.length})`;
+        label.style.flexGrow = '1';
+        header.appendChild(label);
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn btn-sm btn-link text-white';
+        toggleBtn.setAttribute('data-bs-toggle', 'collapse');
+        toggleBtn.setAttribute('data-bs-target', `#collapse${sanitizedId}`);
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.setAttribute('aria-controls', `collapse${sanitizedId}`);
+        toggleBtn.textContent = 'Details';
+        header.appendChild(toggleBtn);
+        card.appendChild(header);
+        const collapse = document.createElement('div');
+        collapse.className = 'collapse';
+        collapse.id = `collapse${sanitizedId}`;
+        const list = document.createElement('ul');
+        list.className = 'list-group list-group-flush';
+        eventsInCat.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          const dateStr = item.date.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+          li.textContent = `${dateStr} — ${item.desc}`;
+          list.appendChild(li);
+        });
+        collapse.appendChild(list);
+        card.appendChild(collapse);
+        container.appendChild(card);
+      });
+    }
+
+    function buildCalendarEvents(data) {
+      globalEvents = [];
+      let earliest = null;
+      let latest = null;
+      data.forEach(row => {
+        const dateVal = row['Date'];
+        const item = row['Item']?.toString().trim();
+        const desc = row['Description']?.toString().trim() || '';
+        if (!dateVal || !item) return;
+        const date = new Date(dateVal);
+        if (!earliest || date < earliest) earliest = date;
+        if (!latest || date > latest) latest = date;
+        const eventObj = {
+          title: item,
+          start: date,
+          allDay: true,
+          display: 'block',
+          color: colorMap[item] || COLORS[0],
+          extendedProps: { description: desc }
+        };
+        globalEvents.push(eventObj);
+      });
+      renderCalendarEvents();
+      updateSummary(globalEvents.length, earliest, latest);
+    }
+
+    function updateSummary(count, earliest, latest) {
+      const summaryEl = document.getElementById('summary');
+      if (count > 0) {
+        const startStr = earliest.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        const endStr = latest.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        summaryEl.classList.remove('d-none');
+        summaryEl.textContent = `${count} activities loaded, ranging from ${startStr} to ${endStr}.`;
+      } else {
+        summaryEl.classList.add('d-none');
+      }
+    }
+
+    function loadLocalXlsx(filename) {
+      fetch(filename)
+        .then(response => response.arrayBuffer())
+        .then(buffer => {
+          const workbook = XLSX.read(buffer, { type:'array' });
+          // Assume "Activity List" sheet holds the data
+          let sheetName = 'Activity List';
+          if (!workbook.SheetNames.includes(sheetName)) {
+            sheetName = workbook.SheetNames[0];
+          }
+          const worksheet = workbook.Sheets[sheetName];
+          // Read header from third row (index 2) if necessary
+          // Convert entire sheet to JSON with default header detection
+          let data = XLSX.utils.sheet_to_json(worksheet);
+          // If "Date" field is a string like "Wed, Mar 11" convert to Date object via Date.parse
+          data = data.map(row => {
+            if (row['Date'] && typeof row['Date'] === 'string' && isNaN(Date.parse(row['Date']))) {
+              // Attempt to parse comma-separated date (e.g., "Tue, Mar 11")
+              const parsed = new Date(row['Date']);
+              if (!isNaN(parsed)) row['Date'] = parsed;
+            }
+            return row;
+          });
+          buildActivationSections(data);
+          buildCalendarEvents(data);
+          document.querySelectorAll('.activation-card input[type="checkbox"]').forEach(cb => cb.checked = false);
+        })
+        .catch(err => console.error('Error loading local XLSX:', err));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initCalendar();
+      // Automatically load the local Excel file stored alongside this HTML
+      loadLocalXlsx('Marketing Tracker.xlsx');
+    });
+  </script>
+</body>
+</html>
