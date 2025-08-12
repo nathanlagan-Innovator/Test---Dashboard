@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Innovator ETFs Marketing Calendar (Dropbox)</title>
+  <title>Innovator ETFs Marketing Calendar (Google Sheets)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" />
   <style>
@@ -31,8 +31,10 @@
       </main>
     </div>
   </div>
+  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     const COLORS = ['#5D737E','#64B6AC','#C0D6DF','#C7B198','#A26769','#6B4226','#B2B1B9','#A99985','#77966D','#858ae3','#8e806a','#e9d5ca'];
@@ -47,9 +49,7 @@
         height: 'auto',
         events: [],
         eventDidMount: info => {
-          if (info.event.extendedProps.description) {
-            info.el.setAttribute('title', info.event.extendedProps.description);
-          }
+          if (info.event.extendedProps.description) info.el.setAttribute('title', info.event.extendedProps.description);
         }
       });
       calendar.render();
@@ -87,38 +87,19 @@
         const header = document.createElement('div');
         header.className = 'card-header d-flex align-items-center';
         const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.className = 'form-check-input me-2';
-        cb.dataset.category = cat;
-        cb.onchange = function() {
-          if (this.checked) selectedCategories.add(cat); else selectedCategories.delete(cat);
-          renderCalendarEvents();
-        };
+        cb.type = 'checkbox'; cb.className = 'form-check-input me-2'; cb.dataset.category = cat;
+        cb.onchange = function() { if (this.checked) selectedCategories.add(cat); else selectedCategories.delete(cat); renderCalendarEvents(); };
         header.appendChild(cb);
-        const dot = document.createElement('span');
-        dot.className = 'color-dot';
-        dot.style.backgroundColor = colorMap[cat];
-        header.appendChild(dot);
-        const title = document.createElement('h5');
-        title.className = 'mb-0';
-        title.textContent = cat;
-        header.appendChild(title);
+        const dot = document.createElement('span'); dot.className = 'color-dot'; dot.style.backgroundColor = colorMap[cat]; header.appendChild(dot);
+        const title = document.createElement('h5'); title.className = 'mb-0'; title.textContent = cat; header.appendChild(title);
         card.appendChild(header);
-        const collapse = document.createElement('div');
-        collapse.className = 'card-body collapse';
-        collapse.id = sanitizedId;
-        const list = document.createElement('ul');
-        list.className = 'list-group list-group-flush';
+        const collapse = document.createElement('div'); collapse.className = 'card-body collapse'; collapse.id = sanitizedId;
+        const list = document.createElement('ul'); list.className = 'list-group list-group-flush';
         eventsInCat.forEach(ev => {
-          const li = document.createElement('li');
-          li.className = 'list-group-item';
-          li.textContent = ev.date.toLocaleDateString('en-US') + ': ' + ev.desc;
-          list.appendChild(li);
+          const li = document.createElement('li'); li.className = 'list-group-item'; li.textContent = ev.date.toLocaleDateString('en-US') + ': ' + ev.desc; list.appendChild(li);
         });
         collapse.appendChild(list);
-        header.onclick = () => {
-          collapse.classList.toggle('show');
-        };
+        header.onclick = () => collapse.classList.toggle('show');
         card.appendChild(collapse);
         container.appendChild(card);
       });
@@ -136,29 +117,28 @@
       });
       renderCalendarEvents();
     }
-    function loadFromXlsx(url) {
+    function loadFromGoogleSheet(url) {
       fetch(url)
-        .then(resp => { if (!resp.ok) throw new Error('Network error'); return resp.arrayBuffer(); })
-        .then(buf => {
-          const wb = XLSX.read(buf, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const data = XLSX.utils.sheet_to_json(ws, { raw: false }).map(row => {
-            if (row['Date'] && typeof row['Date'] === 'string' && row['Date'].includes(',')) {
-              const parsed = new Date(row['Date']);
-              if (!isNaN(parsed)) row['Date'] = parsed;
+        .then(res => res.text())
+        .then(text => {
+          Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+              const data = results.data;
+              buildActivationSections(data);
+              buildCalendarEvents(data);
+              document.querySelectorAll('.activation-card input[type="checkbox"]').forEach(cb => cb.checked = false);
             }
-            return row;
           });
-          buildActivationSections(data);
-          buildCalendarEvents(data);
-          document.querySelectorAll('.activation-card input[type="checkbox"]').forEach(cb => cb.checked = false);
         })
-        .catch(err => console.error('Error loading remote file:', err));
+        .catch(err => console.error('Error loading Google Sheet:', err));
     }
     document.addEventListener('DOMContentLoaded', () => {
       initCalendar();
-      const remoteUrl = 'https://dl.dropboxusercontent.com/scl/fi/i7675nhsdlsm93mr1erpb/Marketing-Tracker.xlsx?rlkey=wdxojebxxttpmi9c4qy18h8i3&st=shfqkotl&dl=1';
-      loadFromXlsx(remoteUrl);
+      // Replace the gid parameter if your sheet has multiple tabs. gid=0 refers to the first sheet.
+      const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQVNjUPRjSIZIMOEMX_p5pYA7GPX6tkBra72f5rUuUCKz--LtTF7OkYQ5nrvmPoWDvQ0JKhMyFMzwKp/pub?gid=0&single=true&output=csv';
+      loadFromGoogleSheet(sheetUrl);
     });
   </script>
 </body>
