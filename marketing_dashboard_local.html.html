@@ -3,133 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Innovator ETFs Marketing Dashboard (Dropbox)</title>
-  <!-- Bootstrap CSS -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
-  <!-- FullCalendar CSS -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css"
-  />
+  <title>Innovator ETFs Marketing Calendar (Dropbox)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" />
   <style>
-    body {
-      background-color: #f5f6fa;
-      color: #333;
-      font-family: Arial, sans-serif;
-    }
-    h2 {
-      font-weight: 600;
-      color: #002d38;
-    }
-    .sidebar {
-      height: 100vh;
-      overflow-y: auto;
-      padding: 20px;
-      background-color: #002d38;
-      color: #fff;
-    }
-    .activation-card {
-      margin-bottom: 1rem;
-      border: none;
-    }
-    .activation-card .card-header {
-      background-color: #003f4c;
-      color: #fff;
-      cursor: pointer;
-      padding: 0.5rem 1rem;
-    }
-    .activation-card .card-header .form-check-input {
-      margin-right: 0.5rem;
-    }
-    .activation-card .card-body {
-      padding: 0;
-      background-color: #002d38;
-    }
-    .activation-card .list-group-item {
-      background-color: transparent;
-      border: none;
-      color: #d0e4ec;
-      padding: 0.25rem 1rem;
-    }
-    .activation-card .list-group-item:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-    .main-content {
-      padding: 20px;
-    }
-    .calendar-container {
-      max-width: 100%;
-    }
-    .color-dot {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      margin-right: 0.5rem;
-    }
+    body { background-color: #f5f6fa; font-family: Arial, sans-serif; color: #333; }
+    h2 { color: #002d38; font-weight: 600; }
+    .sidebar { background-color: #002d38; color: #fff; padding: 20px; height: 100vh; overflow-y: auto; }
+    .activation-card { border: none; margin-bottom: 1rem; }
+    .activation-card .card-header { background-color: #003f4c; color: #fff; cursor: pointer; padding: 0.5rem 1rem; }
+    .activation-card .card-body { background-color: #002d38; padding: 0; }
+    .activation-card .list-group-item { background: transparent; border: none; color: #d0e4ec; padding: 0.25rem 1rem; }
+    .activation-card .list-group-item:hover { background-color: rgba(255,255,255,0.1); }
+    .color-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 0.5rem; }
   </style>
 </head>
 <body>
   <div class="container-fluid">
     <div class="row">
-      <nav class="col-md-3 sidebar">
+      <aside class="col-md-3 sidebar">
         <h2 class="mb-4">Activations</h2>
         <div id="activation-sections"></div>
-      </nav>
-      <main class="col-md-9 main-content">
+      </aside>
+      <main class="col-md-9 py-4">
         <h2 class="mb-3">Innovator ETFs Marketing Calendar</h2>
-        <div id="summary" class="alert alert-info d-none"></div>
-        <div id="calendar" class="calendar-container"></div>
+        <div id="calendar"></div>
       </main>
     </div>
   </div>
-
-  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Colors for categories
-    const COLORS = [
-      '#5D737E','#64B6AC','#C0D6DF','#C7B198',
-      '#A26769','#6B4226','#B2B1B9','#A99985',
-      '#77966D','#858ae3','#8e806a','#e9d5ca'
-    ];
+    const COLORS = ['#5D737E','#64B6AC','#C0D6DF','#C7B198','#A26769','#6B4226','#B2B1B9','#A99985','#77966D','#858ae3','#8e806a','#e9d5ca'];
     let colorMap = {};
     let globalEvents = [];
     let calendar;
     let selectedCategories = new Set();
-
     function initCalendar() {
-      const calendarEl = document.getElementById('calendar');
-      calendar = new FullCalendar.Calendar(calendarEl, {
+      calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek'
-        },
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
         height: 'auto',
         events: [],
         eventDidMount: info => {
-          const description = info.event.extendedProps.description;
-          if (description) {
-            info.el.setAttribute('title', description);
+          if (info.event.extendedProps.description) {
+            info.el.setAttribute('title', info.event.extendedProps.description);
           }
         }
       });
       calendar.render();
     }
-
     function renderCalendarEvents() {
       calendar.getEvents().forEach(e => e.remove());
       const filtered = globalEvents.filter(evt => selectedCategories.size === 0 || selectedCategories.has(evt.title));
       filtered.forEach(evt => calendar.addEvent(evt));
     }
-
     function buildActivationSections(data) {
       const container = document.getElementById('activation-sections');
       container.innerHTML = '';
@@ -157,15 +86,15 @@
         card.className = 'card activation-card';
         const header = document.createElement('div');
         header.className = 'card-header d-flex align-items-center';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'form-check-input me-2';
-        checkbox.dataset.category = cat;
-        checkbox.addEventListener('change', function() {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'form-check-input me-2';
+        cb.dataset.category = cat;
+        cb.onchange = function() {
           if (this.checked) selectedCategories.add(cat); else selectedCategories.delete(cat);
           renderCalendarEvents();
-        });
-        header.appendChild(checkbox);
+        };
+        header.appendChild(cb);
         const dot = document.createElement('span');
         dot.className = 'color-dot';
         dot.style.backgroundColor = colorMap[cat];
@@ -182,20 +111,18 @@
         list.className = 'list-group list-group-flush';
         eventsInCat.forEach(ev => {
           const li = document.createElement('li');
-          li.className = 'list-group-item d-flex justify-content-between align-items-start';
+          li.className = 'list-group-item';
           li.textContent = ev.date.toLocaleDateString('en-US') + ': ' + ev.desc;
           list.appendChild(li);
         });
         collapse.appendChild(list);
-        header.addEventListener('click', () => {
-          const current = document.getElementById(sanitizedId);
-          if (current.classList.contains('show')) current.classList.remove('show'); else current.classList.add('show');
-        });
+        header.onclick = () => {
+          collapse.classList.toggle('show');
+        };
         card.appendChild(collapse);
         container.appendChild(card);
       });
     }
-
     function buildCalendarEvents(data) {
       globalEvents = [];
       data.forEach(row => {
@@ -205,29 +132,18 @@
         if (!dateStr || !title) return;
         const d = new Date(dateStr);
         if (isNaN(d)) return;
-        globalEvents.push({
-          title,
-          start: d,
-          color: colorMap[title] || '#4285F4',
-          description: desc
-        });
+        globalEvents.push({ title, start: d, color: colorMap[title] || '#4285F4', description: desc });
       });
       renderCalendarEvents();
     }
-
     function loadFromXlsx(url) {
       fetch(url)
-        .then(response => {
-          if (!response.ok) throw new Error('Network response was not ok');
-          return response.arrayBuffer();
-        })
-        .then(arrayBuffer => {
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json(worksheet, { raw: false }).map(row => {
+        .then(resp => { if (!resp.ok) throw new Error('Network error'); return resp.arrayBuffer(); })
+        .then(buf => {
+          const wb = XLSX.read(buf, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { raw: false }).map(row => {
             if (row['Date'] && typeof row['Date'] === 'string' && row['Date'].includes(',')) {
-              // Attempt to parse comma-separated date (e.g., "Tue, Mar 11")
               const parsed = new Date(row['Date']);
               if (!isNaN(parsed)) row['Date'] = parsed;
             }
@@ -237,15 +153,11 @@
           buildCalendarEvents(data);
           document.querySelectorAll('.activation-card input[type="checkbox"]').forEach(cb => cb.checked = false);
         })
-        .catch(err => {
-          console.error('Error loading remote file:', err);
-        });
+        .catch(err => console.error('Error loading remote file:', err));
     }
-
     document.addEventListener('DOMContentLoaded', () => {
       initCalendar();
-      // Dropbox direct-download URL. Replace this if your share link changes.
-      const remoteUrl = 'https://dl.dropboxusercontent.com/scl/fi/i7675nhsdlsm93mr1erpb/Marketing-Tracker.xlsx?rlkey=wdxojebxxttpmi9c4qy18h8i3&st=5jj9hmb0&dl=1';
+      const remoteUrl = 'https://dl.dropboxusercontent.com/scl/fi/i7675nhsdlsm93mr1erpb/Marketing-Tracker.xlsx?rlkey=wdxojebxxttpmi9c4qy18h8i3&st=shfqkotl&dl=1';
       loadFromXlsx(remoteUrl);
     });
   </script>
